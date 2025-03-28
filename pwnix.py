@@ -5,6 +5,7 @@ import sys
 import shutil
 import os
 import logging
+import random
 
 # Setup logging
 LOG_FILE = os.path.expanduser("~/.pwnix.log")
@@ -72,6 +73,24 @@ def change_mac(args):
     run_command(["ip", "link", "set", "dev", args.interface, "address", args.new_mac])
     run_command(["ip", "link", "set", "dev", args.interface, "up"])
     print("[INFO] MAC address changed successfully.")
+
+def set_mac_random(args):
+    """
+    Generate a random MAC address and set it for the given interface.
+    The MAC address is generated as locally administered and unicast.
+    """
+    require_root()
+    check_tool("ip")
+    # Generate a random MAC address:
+    # - The first octet is forced to be locally administered and unicast.
+    first_octet = (random.randint(0x00, 0xff) & 0xfc) | 0x02
+    mac = [first_octet] + [random.randint(0x00, 0xff) for _ in range(5)]
+    new_mac = ':'.join(f"{octet:02x}" for octet in mac)
+    print(f"[INFO] Changing MAC address of {args.interface} to {new_mac} (random)")
+    run_command(["ip", "link", "set", "dev", args.interface, "down"])
+    run_command(["ip", "link", "set", "dev", args.interface, "address", new_mac])
+    run_command(["ip", "link", "set", "dev", args.interface, "up"])
+    print("[INFO] Random MAC address set successfully.")
 
 
 def set_ip(args):
@@ -186,7 +205,7 @@ def configure_qos(args):
 
 # Argument Parsing Setup
 def main():
-    parser = argparse.ArgumentParser(description="Network management tool with various features for penetration testing.")
+    parser = argparse.ArgumentParser(description="Network management tool by @soynx on github.")
     subparsers = parser.add_subparsers(title="Commands", dest="command")
     subparsers.required = True
 
@@ -205,6 +224,10 @@ def main():
     parser_mac.add_argument("interface", help="Interface for which to change the MAC address")
     parser_mac.add_argument("new_mac", help="New MAC address (format: xx:xx:xx:xx:xx:xx)")
     parser_mac.set_defaults(func=change_mac)
+
+    parser_mac_rnd = subparsers.add_parser("set-mac-rnd", help="Set a random MAC address for an interface")
+    parser_mac_rnd.add_argument("interface", help="Interface for which to set a random MAC address")
+    parser_mac_rnd.set_defaults(func=set_mac_random)
 
     parser_ip = subparsers.add_parser("set-ip", help="Set a specific IP address for an interface")
     parser_ip.add_argument("interface", help="Interface for which the IP address will be set")
